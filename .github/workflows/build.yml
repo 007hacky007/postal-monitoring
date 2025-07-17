@@ -152,6 +152,32 @@ jobs:
       with:
         name: debian-package-${{ steps.version.outputs.version }}
 
+    - name: List downloaded files
+      run: |
+        echo "Current directory contents:"
+        ls -la
+        echo "Looking for .deb files:"
+        find . -name "*.deb" -type f
+        echo "All files in current directory:"
+        find . -type f
+
+    - name: Prepare release file
+      run: |
+        # Find the .deb file and ensure it has the correct name
+        DEB_FILE=$(find . -name "*.deb" -type f | head -1)
+        if [ -n "$DEB_FILE" ]; then
+          EXPECTED_NAME="postal-monitor_${{ steps.version.outputs.version }}_all.deb"
+          if [ "$DEB_FILE" != "./$EXPECTED_NAME" ]; then
+            echo "Renaming $DEB_FILE to $EXPECTED_NAME"
+            mv "$DEB_FILE" "$EXPECTED_NAME"
+          fi
+          echo "Release file ready: $EXPECTED_NAME"
+          ls -la "$EXPECTED_NAME"
+        else
+          echo "ERROR: No .deb file found!"
+          exit 1
+        fi
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
@@ -168,7 +194,8 @@ jobs:
           sudo apt-get install -f  # if there are dependency issues
           ```
           
-          
+        files: |
+          postal-monitor_${{ steps.version.outputs.version }}_all.deb
         draft: false
         prerelease: false
       env:
