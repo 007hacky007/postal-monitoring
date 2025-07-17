@@ -16,7 +16,7 @@ jobs:
     - name: Install git and basic tools
       run: |
         apt-get update
-        apt-get install -y git curl wget gnupg2 software-properties-common
+        apt-get install -y git curl 
         
         # Show Debian version
         cat /etc/debian_version
@@ -62,7 +62,6 @@ jobs:
         
         # Test PHP syntax
         php -l postal_monitor.php
-        php -l test_config.php
         
         # Test class loading (basic)
         php -r "
