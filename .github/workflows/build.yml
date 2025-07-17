@@ -1,0 +1,159 @@
+name: Build Debian Package
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: pdo, pdo_mysql, curl
+        tools: composer
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y dpkg-dev
+
+    - name: Validate composer.json
+      run: composer validate --strict
+
+    - name: Install PHP dependencies
+      run: composer install --no-dev --optimize-autoloader --no-interaction
+
+    - name: Run tests
+      run: |
+        # Test configuration parsing
+        php -r "
+        \$config = parse_ini_file('config.ini', true);
+        if (\$config === false) {
+          echo 'Failed to parse config.ini\n';
+          exit(1);
+        }
+        echo 'Configuration validation passed\n';
+        "
+
+    - name: Set package version
+      id: version
+      run: |
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/v}
+        else
+          VERSION="1.0.0-${GITHUB_SHA::8}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Building version: $VERSION"
+
+    - name: Update package version in build script
+      run: |
+        sed -i 's/VERSION="1.0.0"/VERSION="${{ steps.version.outputs.version }}"/' build_deb.sh
+
+    - name: Make build script executable
+      run: chmod +x build_deb.sh
+
+    - name: Build Debian package
+      run: ./build_deb.sh
+
+    - name: List built packages
+      run: ls -la *.deb
+
+    - name: Test package installation
+      run: |
+        # Test package structure
+        dpkg-deb --contents postal-monitor_*.deb
+        
+        # Test package info
+        dpkg-deb --info postal-monitor_*.deb
+
+    - name: Upload package as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: debian-package-${{ steps.version.outputs.version }}
+        path: postal-monitor_*.deb
+        retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set version
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Download package artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: debian-package-${{ steps.version.outputs.version }}
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ steps.version.outputs.version }}
+        body: |
+          ## Postal Monitor v${{ steps.version.outputs.version }}
+          
+          ### Installation
+          
+          Download the `.deb` package and install:
+          ```bash
+          sudo dpkg -i postal-monitor_${{ steps.version.outputs.version }}_all.deb
+          sudo apt-get install -f  # if there are dependency issues
+          ```
+          
+          ### Configuration
+          
+          1. Edit the configuration file:
+             ```bash
+             sudo nano /etc/postal-monitor/config.ini
+             ```
+          
+          2. Start the service:
+             ```bash
+             sudo systemctl start postal-monitor
+             sudo systemctl enable postal-monitor
+             ```
+          
+          3. Check status and logs:
+             ```bash
+             sudo systemctl status postal-monitor
+             sudo journalctl -u postal-monitor -f
+             ```
+          
+          ### Changes
+          
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for detailed changes.
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./postal-monitor_${{ steps.version.outputs.version }}_all.deb
+        asset_name: postal-monitor_${{ steps.version.outputs.version }}_all.deb
+        asset_content_type: application/vnd.debian.binary-package

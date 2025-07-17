@@ -1,0 +1,20 @@
+{
+    "name": "007hacky007/postal-error-reporting",
+    "description": "PHP CLI tool for monitoring Postal mail server delivery failures",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "ext-mysqli": "*",
+        "ext-pdo": "*",
+        "phpmailer/phpmailer": "^6.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "PostalMonitor\\": "src/"
+        }
+    },
+    "scripts": {
+        "monitor": "php postal_monitor.php",
+        "check-once": "php postal_monitor.php --once"
+    }
+}
