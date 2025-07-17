@@ -76,9 +76,7 @@ ReadWritePaths=/var/lib/postal-monitor
 WantedBy=multi-user.target
 EOF
 
-EOF
-
-# Create postinst script (post-installation)
+# Create control file
 cat > "$DEBIAN_DIR/control" << EOF
 Package: $PACKAGE_NAME
 Version: $VERSION
