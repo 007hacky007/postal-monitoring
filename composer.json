@@ -2,6 +2,7 @@
     "name": "007hacky007/postal-error-reporting",
     "description": "PHP CLI tool for monitoring Postal mail server delivery failures",
     "type": "project",
+    "license": "MIT",
     "require": {
         "php": ">=7.4",
         "ext-mysqli": "*",
