@@ -75,6 +75,7 @@ jobs:
 
     - name: Set package version
       id: version
+      shell: bash
       run: |
         if [[ $GITHUB_REF == refs/tags/* ]]; then
           VERSION=${GITHUB_REF#refs/tags/v}
@@ -129,6 +130,7 @@ jobs:
 
     - name: Set version
       id: version
+      shell: bash
       run: |
         VERSION=${GITHUB_REF#refs/tags/v}
         echo "version=$VERSION" >> $GITHUB_OUTPUT
