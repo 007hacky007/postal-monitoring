@@ -2,30 +2,36 @@ name: Build Debian Package
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ master ]
     tags: [ 'v*' ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ master ]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest 
+    container: debian:bookworm-slim  # Actual build environment (Debian 12)
     
     steps:
+    - name: Install git and basic tools
+      run: |
+        apt-get update
+        apt-get install -y git curl wget gnupg2 software-properties-common
+        
+        # Show Debian version
+        cat /etc/debian_version
+        echo "Building on Debian $(cat /etc/debian_version)"
+
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.1'
-        extensions: pdo, pdo_mysql, curl
-        tools: composer
-
-    - name: Install build dependencies
+    - name: Install PHP and build dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y dpkg-dev
+        apt-get update
+        apt-get install -y php8.2-cli php8.2-mysql php8.2-curl php8.2-mbstring php8.2-xml unzip dpkg-dev
+        
+        # Install Composer
+        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
     - name: Validate composer.json
       run: composer validate --strict
@@ -35,9 +41,9 @@ jobs:
       uses: actions/cache@v3
       with:
         path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        key: debian-bookworm-php-${{ hashFiles('**/composer.lock') }}
         restore-keys: |
-          ${{ runner.os }}-php-
+          debian-bookworm-php-
 
     - name: Install PHP dependencies
       run: composer install --no-dev --optimize-autoloader --no-interaction
@@ -110,9 +116,15 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    container: debian:bookworm-slim
     if: startsWith(github.ref, 'refs/tags/')
     
     steps:
+    - name: Install git
+      run: |
+        apt-get update
+        apt-get install -y git
+
     - name: Checkout code
       uses: actions/checkout@v4
 
@@ -150,7 +162,7 @@ jobs:
           
           1. Edit the configuration file:
              ```bash
-             sudo nano /etc/postal-monitor/config.ini
+             sudo vi /etc/postal-monitor/config.ini
              ```
           
           2. Start the service:
@@ -165,9 +177,6 @@ jobs:
              sudo journalctl -u postal-monitor -f
              ```
           
-          ### Changes
-          
-          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for detailed changes.
         draft: false
         prerelease: false
 
