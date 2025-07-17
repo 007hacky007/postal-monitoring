@@ -7,6 +7,10 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: write  # Required to create releases and upload assets
+  packages: write  # Optional: if you want to publish to GitHub Packages
+
 jobs:
   build:
     runs-on: ubuntu-latest 
@@ -119,10 +123,13 @@ jobs:
         retention-days: 30
 
   release:
-    needs: build
     runs-on: ubuntu-latest
     container: debian:bookworm-slim
+    needs: build
     if: startsWith(github.ref, 'refs/tags/')
+    
+    permissions:
+      contents: write  # Required for creating releases
     
     steps:
     - name: Install git
@@ -146,13 +153,10 @@ jobs:
         name: debian-package-${{ steps.version.outputs.version }}
 
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ github.ref }}
-        release_name: Release ${{ steps.version.outputs.version }}
+        name: Release ${{ steps.version.outputs.version }}
         body: |
           ## Postal Monitor v${{ steps.version.outputs.version }}
           
@@ -164,34 +168,8 @@ jobs:
           sudo apt-get install -f  # if there are dependency issues
           ```
           
-          ### Configuration
-          
-          1. Edit the configuration file:
-             ```bash
-             sudo vi /etc/postal-monitor/config.ini
-             ```
-          
-          2. Start the service:
-             ```bash
-             sudo systemctl start postal-monitor
-             sudo systemctl enable postal-monitor
-             ```
-          
-          3. Check status and logs:
-             ```bash
-             sudo systemctl status postal-monitor
-             sudo journalctl -u postal-monitor -f
-             ```
           
         draft: false
         prerelease: false
-
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./postal-monitor_${{ steps.version.outputs.version }}_all.deb
-        asset_name: postal-monitor_${{ steps.version.outputs.version }}_all.deb
-        asset_content_type: application/vnd.debian.binary-package
