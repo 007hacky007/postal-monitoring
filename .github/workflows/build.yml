@@ -30,6 +30,15 @@ jobs:
     - name: Validate composer.json
       run: composer validate --strict
 
+    - name: Cache Composer packages
+      id: composer-cache
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php-
+
     - name: Install PHP dependencies
       run: composer install --no-dev --optimize-autoloader --no-interaction
 
@@ -43,6 +52,20 @@ jobs:
           exit(1);
         }
         echo 'Configuration validation passed\n';
+        "
+        
+        # Test PHP syntax
+        php -l postal_monitor.php
+        php -l test_config.php
+        
+        # Test class loading (basic)
+        php -r "
+        require_once 'vendor/autoload.php';
+        if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+          echo 'PHPMailer not found\n';
+          exit(1);
+        }
+        echo 'Dependencies loaded correctly\n';
         "
 
     - name: Set package version
