@@ -104,8 +104,10 @@ class PostalMonitor
         $this->log("Checking for failed deliveries since ID: $lastCheckedId");
 
         // Query for failed deliveries that are newer than our last check
+        // Exclude emails sent by the monitor itself to prevent notification loops
+        $monitorFromEmail = $this->config['notifications']['from_email'];
         $sql = "
-            SELECT 
+            SELECT
                 d.id,
                 d.message_id,
                 d.status,
@@ -122,12 +124,16 @@ class PostalMonitor
             WHERE d.id > :last_checked_id
             AND d.status NOT IN ('Sent', 'SoftFail')
             AND m.scope = 'outgoing'
+            AND m.mail_from != :monitor_from_email
             ORDER BY d.id ASC
         ";
 
         try {
             $stmt = $this->db->prepare($sql);
-            $stmt->execute(['last_checked_id' => $lastCheckedId]);
+            $stmt->execute([
+                'last_checked_id' => $lastCheckedId,
+                'monitor_from_email' => $monitorFromEmail,
+            ]);
             $failures = $stmt->fetchAll();
 
             if (empty($failures)) {
@@ -194,6 +200,15 @@ class PostalMonitor
             // Recipients
             $mail->setFrom($notifConfig['from_email'], 'Postal Monitor');
             $mail->addAddress($notifConfig['email']);
+
+            // Also notify the original sender if enabled
+            if (filter_var($notifConfig['notify_sender'] ?? true, FILTER_VALIDATE_BOOLEAN)) {
+                $senderEmail = $failure['mail_from'] ?? '';
+                if (!empty($senderEmail) && $senderEmail !== $notifConfig['email']) {
+                    $mail->addAddress($senderEmail);
+                    $this->log("Also notifying sender: $senderEmail");
+                }
+            }
 
             // Content
             $mail->isHTML(true);

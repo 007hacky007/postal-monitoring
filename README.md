@@ -6,6 +6,8 @@ A PHP CLI tool for monitoring Postal mail server delivery failures and sending e
 
 - Monitors MariaDB database for failed deliveries
 - Filters for outgoing messages only
+- Notifies both the admin and the original sender about delivery failures
+- Prevents notification loops by excluding monitor-generated emails
 - Tracks already processed failures to avoid duplicate notifications
 - Sends detailed email notifications about delivery failures
 - Supports both continuous monitoring and single-check modes
@@ -57,7 +59,11 @@ use_tls = true
 [notifications]
 email = admin@yourdomain.com
 from_email = postal-monitor@yourdomain.com
+; Also send failure notification to the original sender (mail_from)
+notify_sender = true
 ```
+
+- `notify_sender` — when `true` (default), the original sender of the failed email also receives the failure notification. Set to `false` to only notify the admin.
 
 ### Monitoring Settings
 ```ini
@@ -117,7 +123,7 @@ php postal_monitor.php --config=config.local.ini
 ## SQL Query Used
 
 ```sql
-SELECT 
+SELECT
     d.id,
     d.message_id,
     d.status,
@@ -134,8 +140,11 @@ JOIN messages m ON d.message_id = m.id
 WHERE d.id > :last_checked_id
 AND d.status NOT IN ('Sent', 'SoftFail')
 AND m.scope = 'outgoing'
+AND m.mail_from != :monitor_from_email
 ORDER BY d.id ASC
 ```
+
+The `mail_from != :monitor_from_email` filter prevents notification loops — if a notification email itself fails to deliver, it won't trigger another notification.
 
 ## Notification Email Content
 
