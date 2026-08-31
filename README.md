@@ -63,7 +63,7 @@ from_email = postal-monitor@yourdomain.com
 notify_sender = true
 ```
 
-- `notify_sender` — when `true` (default), the original sender of the failed email also receives the failure notification. Set to `false` to only notify the admin.
+- `notify_sender` - when `true` (default), the original sender of the failed email also receives the failure notification. In that case the sender is the visible `To` recipient and the admin address is added as `Bcc`, so the sender does not see who else was notified. Set to `false` to only notify the admin (plain `To`).
 
 ### Monitoring Settings
 ```ini

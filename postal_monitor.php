@@ -199,15 +199,23 @@ class PostalMonitor
 
             // Recipients
             $mail->setFrom($notifConfig['from_email'], 'Postal Monitor');
-            $mail->addAddress($notifConfig['email']);
 
-            // Also notify the original sender if enabled
+            // Also notify the original sender if enabled; in that case the
+            // admin address goes to Bcc so the sender does not see it
+            $senderNotified = false;
             if (filter_var($notifConfig['notify_sender'] ?? true, FILTER_VALIDATE_BOOLEAN)) {
                 $senderEmail = $failure['mail_from'] ?? '';
                 if (!empty($senderEmail) && $senderEmail !== $notifConfig['email']) {
                     $mail->addAddress($senderEmail);
+                    $senderNotified = true;
                     $this->log("Also notifying sender: $senderEmail");
                 }
+            }
+
+            if ($senderNotified) {
+                $mail->addBCC($notifConfig['email']);
+            } else {
+                $mail->addAddress($notifConfig['email']);
             }
 
             // Content
